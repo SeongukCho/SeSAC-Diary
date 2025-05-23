@@ -28,6 +28,8 @@ async def sign_new_user(data: UserSignUp, session = Depends(get_session)) -> dic
         email=data.email,
         password=hash_password.hash_password(data.password),
         username=data.username, 
+        hobby=data.hobby,
+        role=data.role,
         diarys=[]
     )
     session.add(new_user)
