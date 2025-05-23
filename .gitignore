@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.log
+
+# 환경설정
+.env
+.env.*
+*.sqlite3
+*.db
+
+# 가상환경
+venv/
+.venv/
+ENV/
+env/
+pip-selfcheck.json
+
+# IDE 설정
+.vscode/
+.idea/
+*.swp
+*~
+
+# mypy, pytest, coverage 등 도구 생성 파일
+.mypy_cache/
+.pytest_cache/
+coverage.xml
+htmlcov/
+.tox/
+
+# FastAPI static or media (선택 사항)
+staticfiles/
+media/
+
+# Uvicorn log file (선택 시)
+uvicorn.log
