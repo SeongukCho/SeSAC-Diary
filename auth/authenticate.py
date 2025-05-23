@@ -4,6 +4,9 @@ from fastapi.security import OAuth2PasswordBearer
 from auth.jwt_handler import verify_jwt_token
 
 # 요청이 들어올때 Authorization 헤더의 토큰 값을 추출
+# 요청이 들어올 때 Authorization 헤더의 토큰 값을 추출
+# tokenUrl : 클라이언트가 토큰을 요청할 때 사용할 엔드포인트로, 
+#            FastAPI의 자동 문서화에 사용되는 정보
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/users/signin")
 
 async def authenticate(token: str = Depends(oauth2_scheme)):
