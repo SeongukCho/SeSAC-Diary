@@ -25,3 +25,21 @@ def upload_file_to_s3(file, filename=None) -> str:
     )
 
     return f"https://{BUCKET_NAME}.s3.{os.getenv('AWS_REGION')}.amazonaws.com/{filename}"
+
+def get_presigned_url(file_type: str) -> dict:
+    s3 = boto3.client(
+        "s3",
+        aws_access_key_id=os.getenv("AWS_ACCESS_KEY"),
+        aws_secret_access_key=os.getenv("AWS_SECRET_KEY"),
+        region_name=os.getenv("AWS_REGION")
+    )
+    filename = f"{uuid4()}"
+    presigned_url = s3.generate_presigned_url(
+        ClientMethod='put_object',
+        Params={
+            'Bucket': os.getenv("AWS_S3_BUCKET"),
+            'Key': filename + '.' + file_type,
+        },
+        ExpiresIn=3600
+    )
+    return {"url": presigned_url, "key": filename}
