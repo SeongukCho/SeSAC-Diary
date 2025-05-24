@@ -6,7 +6,10 @@ class Settings(BaseSettings):
     DATABASE_URL: Optional[str] = None
     SECRET_KEY: Optional[str] = None
     print(SECRET_KEY)
-    
+    aws_access_key: str
+    aws_secret_key: str
+    aws_s3_bucket: str
+    aws_region: str
     class Config:
         env_file = ".env"
 

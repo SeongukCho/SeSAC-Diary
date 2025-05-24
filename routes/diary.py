@@ -6,6 +6,7 @@ from sqlmodel import select
 from auth.authenticate import authenticate
 from database.connection import get_session
 from models.diarys import Diary, DiaryUpdate
+from utils.s3 import upload_file_to_s3,get_presigned_url
 
 
 diary_router = APIRouter(tags=["Diary"])
@@ -17,6 +18,14 @@ from pathlib import Path as FilePath
 FILE_DIR = FilePath("C:/temp/uploads")
 FILE_DIR.mkdir(exist_ok=True)
 
+# presigned_url 생성  /presigned-url => get_presigned_url()
+@diary_router.get("/presigned-url")
+async def generate_presigned_url(file_type: str, user_id: int = Depends(authenticate)):
+    try:
+        url_data = get_presigned_url(file_type)
+        return url_data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # 일기장 전체 조회  /diarys/ => retrive_all_diarys()
 @diary_router.get("/", response_model=List[Diary])
@@ -41,26 +50,18 @@ async def retirve_diary(diary_id: int, session = Depends(get_session)) -> Diary:
 @diary_router.post("/", status_code=status.HTTP_201_CREATED)
 # async def create_diary(data = Form(...), user_id = Depends(authenticate), session = Depends(get_session)) -> dict:
 async def create_diary(
-        data = Form(...),                   # Form으로 전달된 데이터
+        data: dict = Body(...),                   # Form으로 전달된 데이터
         user_id = Depends(authenticate),    # 인증된 사용자 ID
-        image: UploadFile = File(...),      # 업로드된 파일 정보를 저장할 변수   
         session = Depends(get_session)      # DB 세션
     ) -> dict:
 
     # 전달된 데이터를 JSON 형식으로 변환 후 Diary 모델에 맞게 변환
-    data = json.loads(data)
     data = Diary(**data)
     
     # 파일을 저장
-    file_path = FILE_DIR / image.filename
-    with open(file_path, "wb") as file:
-        file.write(image.file.read())
-
-    # 파일 경로를 Diary 모델의 image 필드에 저장
-    data.image = str(file_path)
+    data.user_id = user_id   
 
 
-    data.user_id = user_id
     session.add(data)
     session.commit()
     session.refresh(data)
