@@ -6,7 +6,7 @@ from sqlmodel import select
 from auth.authenticate import authenticate
 from database.connection import get_session
 from models.diarys import Diary, DiaryUpdate
-from utils.s3 import upload_file_to_s3,get_presigned_url
+from utils.s3 import upload_file_to_s3,get_presigned_url,s3, BUCKET_NAME
 
 
 diary_router = APIRouter(tags=["Diary"])
@@ -26,6 +26,23 @@ async def generate_presigned_url(file_type: str, user_id: int = Depends(authenti
         return url_data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# 다운로드용 Presigned URL 생성
+@diary_router.get("/download-url")
+async def generate_download_url(file_key: str, user_id: int = Depends(authenticate)):
+    try:
+        url = s3.generate_presigned_url(
+            ClientMethod='get_object',
+            Params={
+                'Bucket': BUCKET_NAME,
+                'Key': file_key
+            },
+            ExpiresIn=3600  # 유효기간 1시간
+        )
+        return {"download_url": url}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 # 일기장 전체 조회  /diarys/ => retrive_all_diarys()
 @diary_router.get("/", response_model=List[Diary])
