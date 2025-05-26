@@ -109,3 +109,27 @@ async def sign_in(data: OAuth2PasswordRequestForm = Depends(), session = Depends
     #         "access_token": create_jwt_token(user.email, user.id)
     #     }
     # )
+
+
+@user_router.get("/checkemail/{email}", response_model=dict)
+async def check_email(email: str, session = Depends(get_session)):
+    statement = select(User).where(User.email == email)
+    user = session.exec(statement).first()
+    if user:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="이미 등록된 이메일입니다."
+        )
+    return {"message" : "Email available"}
+
+
+@user_router.get("/checkusername/{username}")
+async def check_nickname(username: str, session = Depends(get_session)):
+    statement = select(User).where(User.username == username)  # 여기서 'username'을 'nickname'으로 변경
+    user = session.exec(statement).first()
+    if user:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="이미 등록된 닉네임입니다."
+        )
+    return {"message": "Username available"}
