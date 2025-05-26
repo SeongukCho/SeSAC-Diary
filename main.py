@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from routes.users import user_router
 from routes.diary import diary_router
 from database.connection import conn
+from starlette.middleware.sessions import SessionMiddleware  
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -25,6 +26,10 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key="your_session_secret_key"  # 반드시 충분히 복잡한 값으로 설정!
 )
 
 app.include_router(user_router, prefix="/users")
