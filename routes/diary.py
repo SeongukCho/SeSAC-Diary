@@ -6,6 +6,11 @@ from sqlmodel import select
 from auth.authenticate import authenticate
 from database.connection import get_session
 from models.diarys import Diary, DiaryUpdate
+<<<<<<< Updated upstream
+=======
+from utils.s3 import upload_file_to_s3,get_presigned_url,s3, BUCKET_NAME
+from utils.clova import analyze_emotion_async
+>>>>>>> Stashed changes
 
 
 diary_router = APIRouter(tags=["Diary"])
@@ -52,12 +57,20 @@ async def create_diary(
     data = Diary(**data)
     
     # 파일을 저장
+<<<<<<< Updated upstream
     file_path = FILE_DIR / image.filename
     with open(file_path, "wb") as file:
         file.write(image.file.read())
 
     # 파일 경로를 Diary 모델의 image 필드에 저장
     data.image = str(file_path)
+=======
+    data.user_id = user_id
+    
+    # 감정 분석 결과 추가
+    emotion = await analyze_emotion_async(data.content)
+    data.emotion = emotion
+>>>>>>> Stashed changes
 
 
     data.user_id = user_id

@@ -13,6 +13,7 @@ class Diary(SQLModel, table=True):
     content: str
     image: str
     state: str
+    emotion: Optional[str] = None
     user_id: Optional[int] = Field(default=None, foreign_key="user.id")
     user: Optional["User"] = Relationship(back_populates="diarys")
 
