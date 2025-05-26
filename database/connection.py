@@ -5,7 +5,7 @@ from sqlmodel import SQLModel, create_engine, Session
 class Settings(BaseSettings):
     DATABASE_URL: Optional[str] = None
     SECRET_KEY: Optional[str] = None
-
+    
     aws_access_key: str
     aws_secret_key: str
     aws_s3_bucket: str
@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str
     GOOGLE_CLIENT_SECRET: str
     GOOGLE_REDIRECT_URI: str
+    
+    clova_api_key: str
+    
     class Config:
         env_file = ".env"
 
