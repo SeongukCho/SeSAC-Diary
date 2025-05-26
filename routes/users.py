@@ -83,7 +83,7 @@ async def sign_new_user(data: UserSignUp, session = Depends(get_session)) -> dic
 # 로그인
 @user_router.post("/signin")
 async def sign_in(data: OAuth2PasswordRequestForm = Depends(), session = Depends(get_session)) -> dict:
-    statement = select(User).where(User.email == data.userName)
+    statement = select(User).where(User.email == data.username)
     user = session.exec(statement).first()
     if not user:
         raise HTTPException(
@@ -123,9 +123,9 @@ async def check_email(email: str, session = Depends(get_session)):
     return {"message" : "Email available"}
 
 
-@user_router.get("/checkusername/{username}")
-async def check_nickname(username: str, session = Depends(get_session)):
-    statement = select(User).where(User.username == username)  # 여기서 'username'을 'nickname'으로 변경
+@user_router.get("/checkusername/{userName}")
+async def check_nickname(userName: str, session = Depends(get_session)):
+    statement = select(User).where(User.userName == userName)  # 여기서 'userName'을 'nickname'으로 변경
     user = session.exec(statement).first()
     if user:
         raise HTTPException(
