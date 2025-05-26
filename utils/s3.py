@@ -34,12 +34,13 @@ def get_presigned_url(file_type: str) -> dict:
         region_name=os.getenv("AWS_REGION")
     )
     filename = f"{uuid4()}"
+    key = filename + '.' + file_type
     presigned_url = s3.generate_presigned_url(
         ClientMethod='put_object',
         Params={
             'Bucket': os.getenv("AWS_S3_BUCKET"),
-            'Key': filename + '.' + file_type,
+            'Key': key,
         },
         ExpiresIn=3600
     )
-    return {"url": presigned_url, "key": filename}
+    return {"url": presigned_url, "key": key}

@@ -21,4 +21,4 @@ class DiaryUpdate(SQLModel):
     title: Optional[str] = None
     content: Optional[str] = None
     image: Optional[str] = None
-    private: Optional[str] = None
+    state: Optional[str] = None
