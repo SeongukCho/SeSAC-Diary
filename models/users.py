@@ -10,8 +10,7 @@ class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     email: EmailStr
     password: str
-    username: str
-    hobby: str
+    userName: str
     role: str
     diarys: Optional[List["Diary"]] = Relationship(back_populates="user")
 
@@ -22,6 +21,5 @@ class UserSignIn(SQLModel):
 class UserSignUp(SQLModel):
     email: EmailStr
     password: str
-    username: str
-    hobby: str
+    userName: str
     role: str

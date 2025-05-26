@@ -38,7 +38,7 @@ async def google_callback(request: Request, session=Depends(get_session)):
     if not user:
         user = User(
             email=userinfo["email"],
-            username=userinfo.get("name"),
+            userName=userinfo.get("name"),
             password="",  # 소셜 로그인은 패스워드 없음
             hobby="",
             role="user",
@@ -68,8 +68,7 @@ async def sign_new_user(data: UserSignUp, session = Depends(get_session)) -> dic
     new_user = User(
         email=data.email,
         password=hash_password.hash_password(data.password),
-        username=data.username, 
-        hobby=data.hobby,
+        userName=data.userName,
         role=data.role,
         diarys=[]
     )
@@ -84,7 +83,7 @@ async def sign_new_user(data: UserSignUp, session = Depends(get_session)) -> dic
 # 로그인
 @user_router.post("/signin")
 async def sign_in(data: OAuth2PasswordRequestForm = Depends(), session = Depends(get_session)) -> dict:
-    statement = select(User).where(User.email == data.username)
+    statement = select(User).where(User.email == data.userName)
     user = session.exec(statement).first()
     if not user:
         raise HTTPException(
@@ -99,14 +98,14 @@ async def sign_in(data: OAuth2PasswordRequestForm = Depends(), session = Depends
     
     return {
         "message": "로그인에 성공했습니다.",
-        "username": user.username, 
+        "userName": user.userName, 
         "access_token": create_jwt_token(user.email, user.id)
     }
     # return JSONResponse(    
     #     status_code=status.HTTP_200_OK,
     #     content={
     #         "message": "로그인에 성공했습니다.",
-    #         "username": user.username, 
+    #         "userName": user.userName, 
     #         "access_token": create_jwt_token(user.email, user.id)
     #     }
     # )
