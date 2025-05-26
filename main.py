@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from routes.users import user_router
 from routes.diary import diary_router
 from database.connection import conn
