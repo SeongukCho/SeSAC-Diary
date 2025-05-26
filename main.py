@@ -32,7 +32,7 @@ app.add_middleware(
     secret_key="your_session_secret_key"  # 반드시 충분히 복잡한 값으로 설정!
 )
 
-app.include_router(user_router, prefix="/users")
+app.include_router(user_router)
 app.include_router(diary_router, prefix="/diarys")
 
 
