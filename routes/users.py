@@ -7,6 +7,7 @@ from auth.jwt_handler import create_jwt_token
 from database.connection import get_session
 from models.users import User, UserSignIn, UserSignUp
 from utils.oauth import oauth
+from auth.authenticate import authenticate
 import os
 import logging
 
@@ -130,3 +131,19 @@ async def sign_in(data: OAuth2PasswordRequestForm = Depends(), session = Depends
     #         "access_token": create_jwt_token(user.email, user.id)
     #     }
     # )
+
+
+
+@user_router.get("/me")
+async def get_current_user(user_id: int = Depends(authenticate)):
+    return {"user_id": user_id}
+
+@user_router.post("/logout")
+async def logout():
+    response = JSONResponse(content={"message": "로그아웃 완료"})
+    response.delete_cookie(
+        key="access_token",
+        path="/",          # ✅ 쿠키 설정했던 path와 동일하게!
+        samesite="lax"     # 쿠키 설정과 동일해야 확실히 삭제됨
+    )
+    return response
