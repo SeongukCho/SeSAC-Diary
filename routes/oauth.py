@@ -51,5 +51,3 @@ async def google_callback(request: Request, session=Depends(get_session)):
         samesite="lax"
     )
     return response
-
-    return RedirectResponse(url=redirect_url)
