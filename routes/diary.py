@@ -58,9 +58,9 @@ async def retrive_all_diarys(session: Session = Depends(get_session)) -> List[Di
     for diary in diary_results:
         diary_data = diary.model_dump()
         if diary.user:
-            diary_data["userName"] = diary.user.userName
+            diary_data["username"] = diary.user.username
         else:
-            diary_data["userName"] = "알 수 없음"
+            diary_data["username"] = "알 수 없음"
 
         response_diarys.append(DiaryList(**diary_data))
     
@@ -80,9 +80,9 @@ async def retirve_diary(diary_id: int, session: Session = Depends(get_session)) 
     
     diary_data = diary.model_dump()
     if diary.user:
-        diary_data["userName"] = diary.user.userName
+        diary_data["username"] = diary.user.username
     else:
-        diary_data["userName"] = "알 수 없음"
+        diary_data["username"] = "알 수 없음"
     
     # created_at은 이미 diary_data에 포함되어 있으므로 별도로 추가할 필요 없음
     return DiaryList(**diary_data)

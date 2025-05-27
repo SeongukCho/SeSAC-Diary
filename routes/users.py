@@ -40,7 +40,7 @@ async def google_callback(request: Request, session=Depends(get_session)):
     if not user:
         user = User(
             email=userinfo["email"],
-            userName=userinfo.get("name"),
+            username=userinfo.get("name"),
             password="",  # 소셜 로그인은 패스워드 없음
             hobby="",
             role="user",
@@ -83,7 +83,7 @@ async def sign_new_user(data: UserSignUp, session = Depends(get_session)) -> dic
     new_user = User(
         email=data.email,
         password=hash_password.hash_password(data.password),
-        userName=data.userName,
+        username=data.username,
         role=data.role,
         diarys=[]
     )
@@ -140,7 +140,7 @@ async def logout():
     #     status_code=status.HTTP_200_OK,
     #     content={
     #         "message": "로그인에 성공했습니다.",
-    #         "userName": user.userName, 
+    #         "username": user.username, 
     #         "access_token": create_jwt_token(user.email, user.id)
     #     }
     # )
@@ -161,9 +161,9 @@ async def check_email(email: str, session = Depends(get_session)):
     return {"message" : "Email available"}
 
 
-@user_router.get("/checkusername/{userName}")
-async def check_nickname(userName: str, session = Depends(get_session)):
-    statement = select(User).where(User.userName == userName)  # 여기서 'userName'을 'nickname'으로 변경
+@user_router.get("/checkusername/{username}")
+async def check_nickname(username: str, session = Depends(get_session)):
+    statement = select(User).where(User.username == username)  
     user = session.exec(statement).first()
     if user:
         raise HTTPException(
