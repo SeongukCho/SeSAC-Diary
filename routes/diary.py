@@ -1,5 +1,5 @@
 import json
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Path, UploadFile, status, Body
 from fastapi.responses import FileResponse
 from sqlmodel import select, Session
@@ -8,10 +8,10 @@ from database.connection import get_session
 
 from models.diarys import Diary, DiaryUpdate, DiaryList
 from models.users import User
+from datetime import datetime
 
 from utils.s3 import upload_file_to_s3,get_presigned_url,s3, BUCKET_NAME
 from utils.clova import analyze_emotion_async
-
 
 diary_router = APIRouter(tags=["Diary"])
 
@@ -50,8 +50,38 @@ async def generate_download_url(file_key: str, user_id: int = Depends(authentica
 
 # 일기장 전체 조회  /diarys/ => retrive_all_diarys()
 @diary_router.get("/", response_model=List[DiaryList])
-async def retrive_all_diarys(session: Session = Depends(get_session)) -> List[DiaryList]:
+async def retrive_all_diarys(
+    session: Session = Depends(get_session),
+    # Optional[bool]로 state 쿼리 파라미터를 받습니다.
+    # 클라이언트에서 state=true 또는 state=false로 요청할 수 있습니다.
+    # 이 파라미터가 없으면 모든 일기를 반환합니다.
+    state: Optional[bool] = None,
+    current_user: Optional[int] = Depends(authenticate)
+    ) -> List[DiaryList]:
+    
     statement = select(Diary).join(User, isouter=True)
+    
+    # 1. 'state' 쿼리 파라미터에 따른 필터링 로직
+    if state is not None:
+        statement = statement.where(Diary.state == state)
+    
+    # 2. 사용자 권한에 따른 필터링 (핵심!)
+    # `state` 쿼리 파라미터가 명시되지 않은 경우에만 이 로직이 적용되어야 합니다.
+    # 만약 `state=true`로 요청하면 오직 공개 일기만 보여주므로, 추가 로직이 필요 없습니다.
+    # 즉, 사용자가 특정 `state`를 요청하지 않았을 때의 기본 동작을 정의합니다.
+    if state is None: # 사용자가 state 쿼리 파라미터를 제공하지 않았을 때
+        if current_user:
+            # 로그인한 사용자:
+            # - 자신이 작성한 일기 (state 상관 없음) OR
+            # - 다른 사람이 작성한 공개 일기 (state = True)
+            statement = statement.where(
+                (Diary.user_id == current_user) | (Diary.state == True)
+            )
+        else:
+            # 로그인하지 않은 사용자:
+            # - 오직 공개 일기 (state = True)만 볼 수 있음
+            statement = statement.where(Diary.state == True)
+    
     diary_results = session.exec(statement).unique().all()
     
     response_diarys = []
@@ -61,6 +91,10 @@ async def retrive_all_diarys(session: Session = Depends(get_session)) -> List[Di
             diary_data["username"] = diary.user.username
         else:
             diary_data["username"] = "알 수 없음"
+            
+        # `DiaryList` 모델에 `user_id`와 `state`를 포함시키기 위해 추가
+        diary_data["user_id"] = diary.user_id
+        diary_data["state"] = diary.state # <<-- 이 줄을 추가합니다.
 
         response_diarys.append(DiaryList(**diary_data))
     
@@ -68,7 +102,11 @@ async def retrive_all_diarys(session: Session = Depends(get_session)) -> List[Di
 
 # 일기장 상세 조회 /diarys/{diarys_id} => retrive_diary(diary_id)
 @diary_router.get("/{diary_id}", response_model=DiaryList)
-async def retirve_diary(diary_id: int, session: Session = Depends(get_session)) -> DiaryList:
+async def retirve_diary(
+    diary_id: int,
+    session: Session = Depends(get_session),
+    current_user: Optional[int] = Depends(authenticate)
+    ) -> DiaryList:
     statement = select(Diary).where(Diary.id == diary_id).join(User, isouter=True)
     diary = session.exec(statement).first()
 
@@ -78,11 +116,29 @@ async def retirve_diary(diary_id: int, session: Session = Depends(get_session)) 
             detail="일치하는 일기장을 찾을 수 없습니다."
         )
     
+    # current_user가 User 객체인지, 아니면 int (user_id)인지에 따라 다르게 처리
+    authenticated_user_id = None
+    if isinstance(current_user, User): # current_user가 User 객체인 경우
+        authenticated_user_id = current_user.id
+    elif isinstance(current_user, int): # current_user가 user_id (int)인 경우
+        authenticated_user_id = current_user
+    # else: current_user가 None인 경우는 authenticated_user_id도 None
+    
+    # 비공개 일기인 경우 접근 권한 확인
+    # 일기가 'state=False' (비공개)이고, 현재 로그인한 사용자가 일기 작성자가 아닌 경우
+    # current_user.id 대신 authenticated_user_id 사용
+    if not diary.state and (authenticated_user_id is None or diary.user_id != authenticated_user_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="이 일기에 접근할 권한이 없습니다.")
+    
     diary_data = diary.model_dump()
     if diary.user:
         diary_data["username"] = diary.user.username
     else:
         diary_data["username"] = "알 수 없음"
+        
+    # DiaryList 모델에 user_id, state 추가
+    diary_data["user_id"] = diary.user_id
+    diary_data["state"] = diary.state
     
     # created_at은 이미 diary_data에 포함되어 있으므로 별도로 추가할 필요 없음
     return DiaryList(**diary_data)

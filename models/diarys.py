@@ -17,7 +17,7 @@ class Diary(SQLModel, table=True):
     title: str
     content: str
     image: str
-    state: str
+    state: bool
     emotion: Optional[str] = None
     user_id: Optional[int] = Field(default=None, foreign_key="user.id")
     user: Optional["User"] = Relationship(back_populates="diarys")
@@ -28,7 +28,7 @@ class DiaryUpdate(SQLModel):
     title: Optional[str] = None
     content: Optional[str] = None
     image: Optional[str] = None
-    state: Optional[str] = None
+    state: Optional[bool] = None
     
 # 일기 목록 조회 시 반환할 새로운 Pydantic 모델
 # Diary의 모든 필드를 상속하고, username 필드를 추가합니다.
@@ -37,7 +37,7 @@ class DiaryList(SQLModel):
     title: str
     content: str
     image: str
-    state: str
+    state: bool
     emotion: Optional[str] = None
     created_at: datetime # datetime 타입으로 추가
     user_id: Optional[int] = None
