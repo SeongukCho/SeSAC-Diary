@@ -11,7 +11,11 @@ import os
 import logging
 
 
-user_router = APIRouter(tags=["User"])
+user_router = APIRouter(
+    prefix="/api/users",
+    tags=["User"]
+)
+
 
 # users = {}
 
@@ -99,7 +103,7 @@ async def sign_in(data: OAuth2PasswordRequestForm = Depends(), session = Depends
     return {
         "message": "로그인에 성공했습니다.",
         "username": user.username, 
-        "access_token": create_jwt_token(user.email, user.id)
+        "access_token": create_jwt_token(user.id, user.email)
     }
     # return JSONResponse(    
     #     status_code=status.HTTP_200_OK,
