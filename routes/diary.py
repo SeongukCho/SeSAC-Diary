@@ -2,11 +2,15 @@ import json
 from typing import List
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Path, UploadFile, status, Body
 from fastapi.responses import FileResponse
-from sqlmodel import select
+from sqlmodel import select, Session
 from auth.authenticate import authenticate
 from database.connection import get_session
-from models.diarys import Diary, DiaryUpdate
+
+from models.diarys import Diary, DiaryUpdate, DiaryList
+from models.users import User
+
 from utils.s3 import upload_file_to_s3,get_presigned_url,s3, BUCKET_NAME
+from utils.clova import analyze_emotion_async
 
 
 diary_router = APIRouter(tags=["Diary"])
@@ -45,23 +49,43 @@ async def generate_download_url(file_key: str, user_id: int = Depends(authentica
 
 
 # 일기장 전체 조회  /diarys/ => retrive_all_diarys()
-@diary_router.get("/", response_model=List[Diary])
-async def retrive_all_diarys(session = Depends(get_session)) -> List[Diary]:
-    statement = select(Diary)
-    diarys = session.exec(statement)
-    return diarys
+@diary_router.get("/", response_model=List[DiaryList])
+async def retrive_all_diarys(session: Session = Depends(get_session)) -> List[DiaryList]:
+    statement = select(Diary).join(User, isouter=True)
+    diary_results = session.exec(statement).unique().all()
+    
+    response_diarys = []
+    for diary in diary_results:
+        diary_data = diary.model_dump()
+        if diary.user:
+            diary_data["username"] = diary.user.username
+        else:
+            diary_data["username"] = "알 수 없음"
 
-# 일기장 상세 조회  /diarys/{diarys_id} => retrive_diary(diary_id)
-@diary_router.get("/{diary_id}", response_model=Diary)
-async def retirve_diary(diary_id: int, session = Depends(get_session)) -> Diary:
-    diary = session.get(Diary, diary_id)
-    if diary:
-        return diary
+        response_diarys.append(DiaryList(**diary_data))
+    
+    return response_diarys
 
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail="일치하는 일기장를 찾을 수 없습니다."
-    )
+# 일기장 상세 조회 /diarys/{diarys_id} => retrive_diary(diary_id)
+@diary_router.get("/{diary_id}", response_model=DiaryList)
+async def retirve_diary(diary_id: int, session: Session = Depends(get_session)) -> DiaryList:
+    statement = select(Diary).where(Diary.id == diary_id).join(User, isouter=True)
+    diary = session.exec(statement).first()
+
+    if not diary:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="일치하는 일기장을 찾을 수 없습니다."
+        )
+    
+    diary_data = diary.model_dump()
+    if diary.user:
+        diary_data["username"] = diary.user.username
+    else:
+        diary_data["username"] = "알 수 없음"
+    
+    # created_at은 이미 diary_data에 포함되어 있으므로 별도로 추가할 필요 없음
+    return DiaryList(**diary_data)
 
 # 일기장 등록       /diarys/ => create_diary()
 @diary_router.post("/", status_code=status.HTTP_201_CREATED)
@@ -75,14 +99,23 @@ async def create_diary(
     # 전달된 데이터를 JSON 형식으로 변환 후 Diary 모델에 맞게 변환
     data = Diary(**data)
     
-    # 파일을 저장
-    data.user_id = user_id   
+    # # 파일을 저장
+    # file_path = FILE_DIR / image.filename
+    # with open(file_path, "wb") as file:
+    #     file.write(image.file.read())
 
+    # # 파일 경로를 Diary 모델의 image 필드에 저장
+    # data.image = str(file_path)
 
+    data.user_id = user_id
+    
+    # 감정 분석 결과 추가
+    emotion = await analyze_emotion_async(data.content)
+    data.emotion = emotion
+    
     session.add(data)
     session.commit()
     session.refresh(data)
-
 
     return {"message": "일기장 등록이 완료되었습니다."}
 

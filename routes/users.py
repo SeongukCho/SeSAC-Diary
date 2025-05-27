@@ -7,6 +7,8 @@ from auth.jwt_handler import create_jwt_token
 from database.connection import get_session
 from models.users import User, UserSignIn, UserSignUp
 from utils.oauth import oauth
+from fastapi.responses import Response
+from auth.authenticate import authenticate
 from auth.authenticate import authenticate
 import os
 import logging
@@ -52,19 +54,9 @@ async def google_callback(request: Request, session=Depends(get_session)):
     # 2. JWT 발급
     jwt_token = create_jwt_token(user.email, user.id)
 
-    # 3. 쿠키에 JWT 저장 후 프론트로 리다이렉트 (쿼리스트링X)
-    redirect_url = "http://localhost:5173/oauth"
-    response = RedirectResponse(url=redirect_url)
-    response.set_cookie(
-        key="access_token",
-        value=jwt_token,
-        httponly=True,      # JS에서 접근 불가, 보안 ↑
-        secure=False,       # HTTPS 환경에선 True
-        samesite="lax",     # 필요에 따라 "strict" 등 변경
-        max_age=60*60*24,   # 1일, 필요시 조정
-        path="/"
-    )
-    return response
+    # 3. 프론트엔드로 리다이렉트 (JWT는 쿼리스트링으로만 전달, 실제 서비스는 쿠키 권장)
+    redirect_url = f"http://localhost:5173/oauth?token={jwt_token}"
+    return RedirectResponse(url=redirect_url)
 
 # 회원 가입(등록)
 @user_router.post("/signup", status_code=status.HTTP_201_CREATED)
@@ -79,8 +71,7 @@ async def sign_new_user(data: UserSignUp, session = Depends(get_session)) -> dic
     new_user = User(
         email=data.email,
         password=hash_password.hash_password(data.password),
-        username=data.username, 
-        hobby=data.hobby,
+        username=data.username,
         role=data.role,
         diarys=[]
     )
@@ -108,21 +99,11 @@ async def sign_in(data: OAuth2PasswordRequestForm = Depends(), session = Depends
             status_code=status.HTTP_401_UNAUTHORIZED, 
             detail="패스워드가 일치하지 않습니다.")
     
-    jwt_token = create_jwt_token(user.email, user.id)
-    response = JSONResponse(content={
+    return {
         "message": "로그인에 성공했습니다.",
-        "username": user.username
-    })
-    response.set_cookie(
-        key="access_token",
-        value=jwt_token,
-        httponly=True,      # JS에서 접근 못하게 (보안 ↑)
-        secure=False,       # 배포 환경에선 True로 변경!
-        samesite="lax",     # 또는 "strict", 필요에 따라
-        max_age=60*60*24,   # 1일 (초 단위)
-        path="/"
-    )
-    return response
+        "username": user.username, 
+        "access_token": create_jwt_token(user.email, user.id)
+    }
     # return JSONResponse(    
     #     status_code=status.HTTP_200_OK,
     #     content={
@@ -131,19 +112,3 @@ async def sign_in(data: OAuth2PasswordRequestForm = Depends(), session = Depends
     #         "access_token": create_jwt_token(user.email, user.id)
     #     }
     # )
-
-
-
-@user_router.get("/me")
-async def get_current_user(user_id: int = Depends(authenticate)):
-    return {"user_id": user_id}
-
-@user_router.post("/logout")
-async def logout():
-    response = JSONResponse(content={"message": "로그아웃 완료"})
-    response.delete_cookie(
-        key="access_token",
-        path="/",          # ✅ 쿠키 설정했던 path와 동일하게!
-        samesite="lax"     # 쿠키 설정과 동일해야 확실히 삭제됨
-    )
-    return response
