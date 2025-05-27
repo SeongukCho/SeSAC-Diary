@@ -159,6 +159,10 @@ async def update_diary(data: DiaryUpdate,
         for key, value in diary_data.items():
             setattr(diary, key, value)
 
+        if 'content' in diary_data:
+            emotion = await analyze_emotion_async(diary.content)
+            diary.emotion = emotion
+
         session.add(diary)
         session.commit()
         session.refresh(diary)
