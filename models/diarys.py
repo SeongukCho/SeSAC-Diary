@@ -1,5 +1,5 @@
 from typing import TYPE_CHECKING, List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlmodel import JSON, Column, Field, Relationship, SQLModel
 
 # from models.users import User
@@ -8,6 +8,10 @@ from sqlmodel import JSON, Column, Field, Relationship, SQLModel
 if TYPE_CHECKING:
     from models.users import User
 
+def korea_now():                                                        #캘린더
+    return datetime.utcnow() + timedelta(hours=9)                       #캘린더
+
+
 class Diary(SQLModel, table=True):
     id: int = Field(default=None, primary_key=True)
     title: str
@@ -15,9 +19,9 @@ class Diary(SQLModel, table=True):
     image: str
     state: str
     emotion: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.now) # 현재 시간으로 기본값 설정
     user_id: Optional[int] = Field(default=None, foreign_key="user.id")
     user: Optional["User"] = Relationship(back_populates="diarys")
+    created_at: datetime = Field(default_factory=korea_now, nullable=False) # 현재 시간으로 기본값 설정
 
 # 일기장 수정 시 전달되는 데이터 모델
 class DiaryUpdate(SQLModel):
