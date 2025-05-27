@@ -4,6 +4,7 @@ from routes.users import user_router
 from routes.diary import diary_router
 from database.connection import conn
 from starlette.middleware.sessions import SessionMiddleware  
+from routes.oauth import oauth_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -33,6 +34,7 @@ app.add_middleware(
 
 app.include_router(user_router, prefix="/users")
 app.include_router(diary_router, prefix="/diarys")
+app.include_router(oauth_router, prefix="/users")
 
 
 if __name__ == "__main__":
