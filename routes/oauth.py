@@ -40,8 +40,8 @@ async def google_callback(request: Request, session=Depends(get_session)):
 
     jwt_token = create_jwt_token(user.email, user.id)
 
-    redirect_url = f"http://localhost:5173/oauth"
-    response = RedirectResponse("http://localhost:5173/oauth")
+    redirect_url = f"http://localhost:5173/list"
+    response = RedirectResponse(redirect_url)
     response.set_cookie(
         key="access_token",
         value=jwt_token,
