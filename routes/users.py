@@ -20,6 +20,55 @@ user_router = APIRouter(tags=["User"])
 hash_password = HashPassword()
 logger = logging.getLogger("uvicorn.error")
 
+# 구글 OAuth 로그인
+@user_router.get("/google/login")
+async def google_login(request: Request):
+    redirect_uri = os.getenv("GOOGLE_REDIRECT_URI")
+    return await oauth.google.authorize_redirect(request, redirect_uri)
+
+# 구글 OAuth 인증 후 콜백
+@user_router.get("/google/callback")
+async def google_callback(request: Request, session=Depends(get_session)):
+    token = await oauth.google.authorize_access_token(request)
+    userinfo = token.get("userinfo")
+    if not userinfo:
+        userinfo = await oauth.google.parse_id_token(request, token)
+
+    # 1. DB에서 사용자 조회 또는 생성
+    statement = select(User).where(User.email == userinfo["email"])
+    user = session.exec(statement).first()
+    if not user:
+        user = User(
+            email=userinfo["email"],
+            userName=userinfo.get("name"),
+            password="",  # 소셜 로그인은 패스워드 없음
+            hobby="",
+            role="user",
+            diarys=[]
+        )
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+
+    # 2. JWT 발급
+    jwt_token = create_jwt_token(user.email, user.id)
+
+    redirect_url = "http://localhost:5173/oauth"
+
+    # RedirectResponse 객체 생성
+    response = RedirectResponse(url=redirect_url)
+
+    # 쿠키 설정 (운영 시 secure=True, samesite="lax" 또는 "strict"로)
+    response.set_cookie(
+        key="access_token",
+        value=jwt_token,
+        httponly=True,      # JS에서 접근 못하게 (XSS 방지)
+        secure=False,       # 개발 환경은 False, HTTPS에서는 True
+        samesite="lax",     # 또는 "strict", 필요에 따라 조절
+        max_age=60*60*24    # 1일 (초단위, 필요시 변경)
+    )
+
+    return response
 
 # 회원 가입(등록)
 @user_router.post("/signup", status_code=status.HTTP_201_CREATED)
@@ -34,8 +83,7 @@ async def sign_new_user(data: UserSignUp, session = Depends(get_session)) -> dic
     new_user = User(
         email=data.email,
         password=hash_password.hash_password(data.password),
-        username=data.username, 
-        hobby=data.hobby,
+        userName=data.userName,
         role=data.role,
         diarys=[]
     )
@@ -92,7 +140,7 @@ async def logout():
     #     status_code=status.HTTP_200_OK,
     #     content={
     #         "message": "로그인에 성공했습니다.",
-    #         "username": user.username, 
+    #         "userName": user.userName, 
     #         "access_token": create_jwt_token(user.email, user.id)
     #     }
     # )
@@ -101,3 +149,25 @@ async def logout():
 @user_router.get("/me")
 async def get_current_user(user_id: int = Depends(authenticate)):
     return {"user_id": user_id}
+@user_router.get("/checkemail/{email}", response_model=dict)
+async def check_email(email: str, session = Depends(get_session)):
+    statement = select(User).where(User.email == email)
+    user = session.exec(statement).first()
+    if user:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="이미 등록된 이메일입니다."
+        )
+    return {"message" : "Email available"}
+
+
+@user_router.get("/checkusername/{userName}")
+async def check_nickname(userName: str, session = Depends(get_session)):
+    statement = select(User).where(User.userName == userName)  # 여기서 'userName'을 'nickname'으로 변경
+    user = session.exec(statement).first()
+    if user:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="이미 등록된 닉네임입니다."
+        )
+    return {"message": "Username available"}
