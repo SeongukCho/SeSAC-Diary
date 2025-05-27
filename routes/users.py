@@ -51,8 +51,10 @@ async def google_callback(request: Request, session=Depends(get_session)):
     # 2. JWT 발급
     jwt_token = create_jwt_token(user.email, user.id)
 
-    # 3. 프론트엔드로 리다이렉트 (JWT는 쿼리스트링으로만 전달, 실제 서비스는 쿠키 권장)
-    redirect_url = f"http://localhost:5173/oauth?token={jwt_token}"
+    # 3. 프론트엔드로 리다이렉트: JWT 토큰과 user.id를 모두 전달!
+    # 클라이언트 프론트엔드 URL이 5173으로 바뀌었으므로, 해당 포트를 사용합니다.
+    # 그리고 쿼리 파라미터 이름을 token과 user_id로 명확히 지정합니다.
+    redirect_url = f"http://localhost:5173/oauth/callback?access_token={jwt_token}&user_id={user.id}"
     return RedirectResponse(url=redirect_url)
 
 # 회원 가입(등록)
