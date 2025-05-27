@@ -247,3 +247,35 @@ async def download_file(diary_id: int, session = Depends(get_session)):
         )
     
     return FileResponse(file_path, media_type="application/octet-stream", filename=FilePath(file_path).name)
+
+@diary_router.delete("/{diary_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_diary(
+    diary_id: int,
+    session: Session = Depends(get_session),
+    user: dict = Depends(authenticate) # 인증된 사용자 정보 가져오기
+):
+    # 1. 일기 조회
+    statement = select(Diary).where(Diary.id == diary_id)
+    diary = session.exec(statement).first()
+
+    if not diary:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="일기를 찾을 수 없습니다."
+        )
+
+    # 2. 권한 확인: 일기 작성자와 현재 로그인한 사용자가 같은지 확인
+    # authenticate 함수가 user_id를 반환한다고 가정
+    if diary.user_id != user["user_id"]: # JWT 페이로드에서 "user_id" 클레임을 확인
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="일기를 삭제할 권한이 없습니다. 일기 작성자만 삭제할 수 있습니다."
+        )
+
+    # 3. 일기 삭제
+    session.delete(diary)
+    session.commit()
+
+    return {"message": "일기가 성공적으로 삭제되었습니다."} # 204 No Content는 보통 응답 본문이 없습니다.
+                                                          # 실제로는 리턴 값이 없거나 Message 클래스를 사용할 수도 있습니다.
+                                                          # 클라이언트에서는 204를 받으면 성공으로 처리합니다.
