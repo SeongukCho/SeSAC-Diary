@@ -1,5 +1,5 @@
 from typing import TYPE_CHECKING, List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from sqlmodel import JSON, Column, Field, Relationship, SQLModel
 
 # from models.users import User
@@ -22,7 +22,7 @@ class Diary(SQLModel, table=True):
     user_id: Optional[int] = Field(default=None, foreign_key="user.id")
     user: Optional["User"] = Relationship(back_populates="diarys")
     created_at: datetime = Field(default_factory=korea_now, nullable=False) # 현재 시간으로 기본값 설정
-    diary_date: datetime = Field(nullable=False)
+    diary_date: date = Field(nullable=False)
 
 # 일기장 수정 시 전달되는 데이터 모델
 class DiaryUpdate(SQLModel):
@@ -41,6 +41,6 @@ class DiaryList(SQLModel):
     state: bool
     emotion: Optional[str] = None
     created_at: datetime # datetime 타입으로 추가
-    diary_date: datetime
+    diary_date: date
     user_id: Optional[int] = None
     username: Optional[str] = None # 작성자 이름 필드
