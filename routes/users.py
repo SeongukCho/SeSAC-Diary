@@ -62,7 +62,7 @@ async def sign_new_user(data: UserSignUp, session = Depends(get_session)) -> dic
     user = session.exec(statement).first()
     if user:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, 
+            status_code=status.HTTP_409_CONFLICT,
             detail="동일한 사용자가 존재합니다.")
     
     new_user = User(
@@ -109,7 +109,6 @@ async def sign_in(data: OAuth2PasswordRequestForm = Depends(), session = Depends
     #         "access_token": create_jwt_token(user.email, user.id)
     #     }
     # )
-
 
 @user_router.get("/checkemail/{email}", response_model=dict)
 async def check_email(email: str, session = Depends(get_session)):
