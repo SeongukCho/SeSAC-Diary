@@ -58,13 +58,13 @@ async def retrive_all_diarys(
     state: Optional[bool] = None,
     current_user: Optional[int] = Depends(authenticate)
     ) -> List[DiaryList]:
-
+    
     statement = select(Diary).join(User, isouter=True)
-
+    
     # 1. 'state' 쿼리 파라미터에 따른 필터링 로직
     if state is not None:
         statement = statement.where(Diary.state == state)
-
+    
     # 2. 사용자 권한에 따른 필터링 (핵심!)
     # `state` 쿼리 파라미터가 명시되지 않은 경우에만 이 로직이 적용되어야 합니다.
     # 만약 `state=true`로 요청하면 오직 공개 일기만 보여주므로, 추가 로직이 필요 없습니다.
@@ -81,9 +81,9 @@ async def retrive_all_diarys(
             # 로그인하지 않은 사용자:
             # - 오직 공개 일기 (state = True)만 볼 수 있음
             statement = statement.where(Diary.state == True)
-
+    
     diary_results = session.exec(statement).unique().all()
-
+    
     response_diarys = []
     for diary in diary_results:
         diary_data = diary.model_dump()
@@ -91,13 +91,13 @@ async def retrive_all_diarys(
             diary_data["username"] = diary.user.username
         else:
             diary_data["username"] = "알 수 없음"
-
+            
         # `DiaryList` 모델에 `user_id`와 `state`를 포함시키기 위해 추가
         diary_data["user_id"] = diary.user_id
         diary_data["state"] = diary.state # <<-- 이 줄을 추가합니다.
 
         response_diarys.append(DiaryList(**diary_data))
-
+    
     return response_diarys
 
 # 일기장 상세 조회 /diarys/{diarys_id} => retrive_diary(diary_id)
@@ -115,7 +115,7 @@ async def retirve_diary(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="일치하는 일기장을 찾을 수 없습니다."
         )
-
+    
     # current_user가 User 객체인지, 아니면 int (user_id)인지에 따라 다르게 처리
     authenticated_user_id = None
     if isinstance(current_user, User): # current_user가 User 객체인 경우
@@ -123,23 +123,23 @@ async def retirve_diary(
     elif isinstance(current_user, int): # current_user가 user_id (int)인 경우
         authenticated_user_id = current_user
     # else: current_user가 None인 경우는 authenticated_user_id도 None
-
+    
     # 비공개 일기인 경우 접근 권한 확인
     # 일기가 'state=False' (비공개)이고, 현재 로그인한 사용자가 일기 작성자가 아닌 경우
     # current_user.id 대신 authenticated_user_id 사용
     if not diary.state and (authenticated_user_id is None or diary.user_id != authenticated_user_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="이 일기에 접근할 권한이 없습니다.")
-
+    
     diary_data = diary.model_dump()
     if diary.user:
         diary_data["username"] = diary.user.username
     else:
         diary_data["username"] = "알 수 없음"
-
+        
     # DiaryList 모델에 user_id, state 추가
     diary_data["user_id"] = diary.user_id
     diary_data["state"] = diary.state
-
+    
     # created_at은 이미 diary_data에 포함되어 있으므로 별도로 추가할 필요 없음
     return DiaryList(**diary_data)
 
@@ -154,7 +154,7 @@ async def create_diary(
 
     # 전달된 데이터를 JSON 형식으로 변환 후 Diary 모델에 맞게 변환
     data = Diary(**data)
-
+    
     # # 파일을 저장
     # file_path = FILE_DIR / image.filename
     # with open(file_path, "wb") as file:
@@ -164,11 +164,11 @@ async def create_diary(
     # data.image = str(file_path)
 
     data.user_id = user_id
-
+    
     # 감정 분석 결과 추가
     emotion = await analyze_emotion_async(data.content)
     data.emotion = emotion
-
+    
     session.add(data)
     session.commit()
     session.refresh(data)
@@ -224,7 +224,7 @@ async def update_diary(data: DiaryUpdate,
         session.refresh(diary)
 
         return diary
-
+    
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
         detail="일치하는 일기장를 찾을 수 없습니다."
@@ -237,52 +237,13 @@ async def download_file(diary_id: int, session = Depends(get_session)):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="일기장를 찾을 수 없습니다."
-        )
-
+        )        
+    
     file_path = diary.image
     if not FilePath(file_path).exists():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="파일을 찾을 수 없습니다."
         )
-
+    
     return FileResponse(file_path, media_type="application/octet-stream", filename=FilePath(file_path).name)
-
-
-
-@diary_router.get("/list/search", response_model=List[DiaryList])
-async def search_diarys(
-        session: Session = Depends(get_session),
-        search: Optional[str] = None,  # 검색어
-) -> List[DiaryList]:
-
-    if not search:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="검색어를 입력해주세요.")
-
-    statement = select(Diary).join(User, isouter=True)
-
-    # 1. 공개된 글만 조회 (state=1)
-    statement = statement.where(Diary.state == 1)  # `state == 1`로 수정
-
-    # 2. 검색어가 있을 경우 제목을 필터링
-    if search:
-        statement = statement.where(Diary.title.ilike(f"%{search}%"))
-
-    diary_results = session.exec(statement).unique().all()
-
-    response_diarys = []
-    for diary in diary_results:
-        diary_data = diary.model_dump()
-        diary_data["username"] = diary.user.username if diary.user else "알 수 없음"
-        diary_data["user_id"] = diary.user_id
-        diary_data["state"] = diary.state
-        response_diarys.append(DiaryList(**diary_data))
-
-    return response_diarys
-
-
-
-
-
-
-
