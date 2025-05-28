@@ -306,3 +306,35 @@ async def get_s3_image_download_url(
     except Exception as e:
         # 실제 운영 환경에서는 에러 로깅 권장
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"이미지 다운로드 URL 생성 중 오류 발생: {str(e)}")
+
+
+@diary_router.get("/list/search", response_model=List[DiaryList])
+async def search_diarys(
+        session: Session = Depends(get_session),
+        search: Optional[str] = None,  # 검색어
+) -> List[DiaryList]:
+
+    if not search:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="검색어를 입력해주세요.")
+    
+    statement = select(Diary).join(User, isouter=True)
+
+    # 공개된 글만 조회 (state=1)
+    statement = statement.where(Diary.state == 1)  # 공개된 글만
+
+    # 검색어가 있을 경우 제목을 필터링
+    if search:
+        statement = statement.where(Diary.title.ilike(f"%{search}%"))
+
+    diary_results = session.exec(statement).unique().all()
+
+    response_diarys = []
+    for diary in diary_results:
+        diary_data = diary.model_dump()
+        diary_data["username"] = diary.user.username if diary.user else "알 수 없음"
+        diary_data["user_id"] = diary.user_id
+        diary_data["state"] = diary.state
+        response_diarys.append(DiaryList(**diary_data))
+
+    return response_diarys
+
