@@ -49,7 +49,7 @@ async def google_callback(request: Request, session=Depends(get_session)):
         session.refresh(user)
 
     # 2. JWT 발급
-    jwt_token = create_jwt_token(user.email, user.id)
+    jwt_token = create_jwt_token(user.email, user.id, user.role)
 
     # 3. 프론트엔드로 리다이렉트 (JWT는 쿼리스트링으로만 전달, 실제 서비스는 쿠키 권장)
     redirect_url = f"http://localhost:5173/oauth?token={jwt_token}"
@@ -99,7 +99,7 @@ async def sign_in(data: OAuth2PasswordRequestForm = Depends(), session = Depends
     return {
         "message": "로그인에 성공했습니다.",
         "username": user.username, 
-        "access_token": create_jwt_token(user.email, user.id)
+        "access_token": create_jwt_token(user.email, user.id, user.role)
     }
     # return JSONResponse(    
     #     status_code=status.HTTP_200_OK,

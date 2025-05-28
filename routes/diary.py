@@ -6,7 +6,7 @@ from sqlmodel import select, Session
 from pydantic import BaseModel # DiaryCreate 모델을 위해 추가
 from datetime import datetime, date # date 타입 사용을 위해 추가
 
-from auth.authenticate import authenticate
+from auth.authenticate import authenticate, get_current_user_role
 from database.connection import get_session
 
 from models.diarys import Diary, DiaryUpdate, DiaryList # DiaryList 모델이 username, user_id, state 필드를 포함해야 함
@@ -73,30 +73,50 @@ async def check_duplicate_diary_exists(
 async def retrieve_all_diaries(
     session: Session = Depends(get_session),
     state: Optional[bool] = None,
-    current_user_id: Optional[int] = Depends(authenticate) # authenticate가 None을 반환할 수 있도록 authenticate 수정 필요 또는 별도 의존성 사용
+    current_user_id: Optional[int] = Depends(authenticate), # authenticate가 None을 반환할 수 있도록 authenticate 수정 필요 또는 별도 의존성 사용
+    user_role: Optional[str] = Depends(get_current_user_role)
 ):
-    statement = select(Diary).join(User, isouter=True) # User 정보를 함께 가져오기 위함
+    statement = select(Diary).join(User, isouter=True).order_by(Diary.created_at.desc()) # User 정보를 함께 가져오기 위함
+    
+    is_admin = (user_role == "admin")
 
     if state is not None:
         statement = statement.where(Diary.state == state)
-        # 공개 일기(state=True)를 요청한 경우, 작성자 상관없이 모든 공개 일기를 보여줘야 함.
-        # 비공개 일기(state=False)를 요청한 경우, 현재 사용자가 작성한 비공개 일기만 보여줘야 함.
-        if not state and current_user_id: # state=False 이고 로그인한 경우
-             statement = statement.where(Diary.user_id == current_user_id)
-        elif not state and not current_user_id: # state=False 이고 로그인 안한 경우, 아무것도 반환하지 않음
-            return []
-
-
-    # state 파라미터가 없을 때 (전체 목록, 기본 필터링)
+        if not state: # 비공개 일기 (state=False)를 요청한 경우
+            if is_admin:
+                # 관리자는 모든 비공개 일기를 볼 수 있습니다. (추가 필터링 없음)
+                pass
+            elif current_user_id:
+                # 일반 사용자는 자신의 비공개 일기만 볼 수 있습니다.
+                statement = statement.where(Diary.user_id == current_user_id)
+            else:
+                # 로그인하지 않은 경우 비공개 일기는 볼 수 없습니다.
+                return []
+        # state=True (공개 일기)인 경우, 누구나 볼 수 있으므로 추가 필터링이 필요 없습니다.
     else:
-        if current_user_id:
-            # 로그인한 사용자: 자신의 모든 일기 + 다른 사람의 공개 일기
+        # state 파라미터가 없을 때 (전체 목록, 기본 필터링)
+        if is_admin:
+            # 관리자는 모든 일기 (공개/비공개 모두)를 볼 수 있습니다.
+            pass
+        elif current_user_id:
+            # 로그인한 일반 사용자: 자신의 모든 일기 + 다른 사람의 공개 일기
             statement = statement.where(
                 (Diary.user_id == current_user_id) | (Diary.state == True)
             )
         else:
-            # 로그인하지 않은 사용자: 모든 공개 일기
+            # 로그인하지 않은 사용자: 모든 공개 일기만 볼 수 있습니다.
             statement = statement.where(Diary.state == True)
+
+    # # state 파라미터가 없을 때 (전체 목록, 기본 필터링)
+    # else:
+    #     if current_user_id:
+    #         # 로그인한 사용자: 자신의 모든 일기 + 다른 사람의 공개 일기
+    #         statement = statement.where(
+    #             (Diary.user_id == current_user_id) | (Diary.state == True)
+    #         )
+    #     else:
+    #         # 로그인하지 않은 사용자: 모든 공개 일기
+    #         statement = statement.where(Diary.state == True)
     
     diary_results = session.exec(statement).unique().all()
     
@@ -121,7 +141,8 @@ async def retrieve_all_diaries(
 async def retrieve_diary(
     diary_id: int,
     session: Session = Depends(get_session),
-    current_user_id: Optional[int] = Depends(authenticate) # 위와 동일하게 Optional 처리
+    current_user_id: Optional[int] = Depends(authenticate), # 위와 동일하게 Optional 처리
+    user_role: Optional[str] = Depends(get_current_user_role)
 ):
     # join(User)를 사용하여 작성자 정보도 함께 로드
     statement = select(Diary).where(Diary.id == diary_id).join(User, isouter=True)
@@ -132,9 +153,12 @@ async def retrieve_diary(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="일치하는 일기를 찾을 수 없습니다."
         )
+        
+    is_admin = (user_role == "admin")
     
     if not diary.state: # 비공개 일기인 경우
-        if not current_user_id or diary.user_id != current_user_id:
+        if not is_admin and (not current_user_id or diary.user_id != current_user_id):
+            # 관리자가 아니고, 로그인하지 않았거나 일기 작성자가 아닌 경우 접근 금지
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="이 일기에 접근할 권한이 없습니다."
@@ -195,7 +219,8 @@ async def update_diary_entry( # 함수 이름 변경 (PEP8, CRUD 느낌 살려�
     diary_id: int,
     payload: DiaryUpdate, # DiaryUpdate 모델은 title, content, state 등 변경 가능한 필드만 포함해야 함
     user_id: int = Depends(authenticate),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    user_role: str = Depends(get_current_user_role)
 ):
     diary = session.get(Diary, diary_id)
     if not diary:
@@ -204,7 +229,7 @@ async def update_diary_entry( # 함수 이름 변경 (PEP8, CRUD 느낌 살려�
             detail="일치하는 일기를 찾을 수 없습니다."
         )
 
-    if diary.user_id != user_id:
+    if user_role != "admin" and diary.user_id != user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="이 일기를 수정할 권한이 없습니다."
@@ -236,7 +261,8 @@ async def update_diary_entry( # 함수 이름 변경 (PEP8, CRUD 느낌 살려�
 async def delete_diary_entry( # 함수 이름 변경
     diary_id: int,
     user_id: int = Depends(authenticate),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    user_role: str = Depends(get_current_user_role)
 ):
     diary = session.get(Diary, diary_id)
     if not diary:
@@ -245,7 +271,7 @@ async def delete_diary_entry( # 함수 이름 변경
             detail="일치하는 일기를 찾을 수 없습니다."
         )
     
-    if diary.user_id != user_id:
+    if user_role != "admin" and diary.user_id != user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="이 일기를 삭제할 권한이 없습니다."
