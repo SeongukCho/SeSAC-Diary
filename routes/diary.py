@@ -232,8 +232,7 @@ async def update_diary_entry( # 함수 이름 변경 (PEP8, CRUD 느낌 살려�
     session.refresh(diary)
     return diary
 
-@diary_router.
-("/{diary_id}", status_code=status.HTTP_204_NO_CONTENT) # 성공 시 204 No Content 반환
+@diary_router.delete("/{diary_id}", status_code=status.HTTP_204_NO_CONTENT) # 성공 시 204 No Content 반환
 async def delete_diary_entry( # 함수 이름 변경
     diary_id: int,
     user_id: int = Depends(authenticate),
@@ -276,25 +275,22 @@ async def delete_all_user_diaries( # 함수 이름 구체화, 현재는 특정 �
         session.delete(diary)
     
     session.commit()
-    return {"message": f"총 {len(diaries_to_delete)}개의 일기가 삭제되었습니다."}
+    return {"message": f"사용자 ID {user_id}의 일기 {len(diaries_to_delete)}개가 삭제되었습니다."}
 
 
 # S3 연동을 가정하고, 로컬 파일 직접 다운로드 대신 Presigned URL 생성 방식으로 변경
 @diary_router.get("/download/s3/{diary_id}", summary="S3 이미지 다운로드 URL 생성")
 async def get_s3_image_download_url(
     diary_id: int,
-    user_info: dict = Depends(authenticate), # user_info 딕셔너리로 받도록 수정
+    user_id: int = Depends(authenticate), # 접근 권한 확인용
     session: Session = Depends(get_session)
 ):
-    user_id = user_info.get("user_id")
-    user_role = user_info.get("role")
-
     diary = session.get(Diary, diary_id)
     if not diary:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="일기를 찾을 수 없습니다.")
 
-    # 비공개 일기인 경우, 작성자 또는 관리자만 이미지 다운로드 URL을 받을 수 있도록 함
-    if not diary.state and (diary.user_id != user_id and user_role != "admin"):
+    # 비공개 일기인 경우, 작성자만 이미지 다운로드 URL을 받을 수 있도록 함
+    if not diary.state and diary.user_id != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="이미지 접근 권한이 없습니다.")
 
     if not diary.image: # Diary.image 필드에 S3 파일 키(key)가 저장되어 있다고 가정

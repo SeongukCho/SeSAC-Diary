@@ -8,7 +8,7 @@ settings = Settings()
 
 
 # JWT 토큰 생성
-def create_jwt_token(user_id: int, email: str) -> str:
+def create_jwt_token(email: str, user_id: int) -> str:
     payload = {"user": email, "user_id": user_id, "iat": time(), "exp": time() + 3600}
     token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
     return token
