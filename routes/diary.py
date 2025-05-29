@@ -162,6 +162,14 @@ async def create_diary(
 
     # # 파일 경로를 Diary 모델의 image 필드에 저장
     # data.image = str(file_path)
+    existing_diary = session.query(Diary).filter(
+        Diary.user_id == user_id,
+        Diary.diary_date == data.diary_date
+    ).first()
+
+    if existing_diary:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="같은 날짜에 이미 작성한 일기가 존재합니다.")
+
 
     data.user_id = user_id
     
