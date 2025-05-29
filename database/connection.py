@@ -22,7 +22,6 @@ class Settings(BaseSettings):
 
 settings = Settings()
     
-
 #database_connection_string = "mysql+pymysql://fastapiuser:p%40ssw0rd@localhost:3306/fastapidb"
 engine_url = create_engine(
     settings.DATABASE_URL,
