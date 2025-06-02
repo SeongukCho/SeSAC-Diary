@@ -152,6 +152,10 @@ async def create_diary(
     user_id: int = Depends(authenticate),
     session: Session = Depends(get_session)
 ):
+
+    if not payload.diary_date:
+        payload.diary_date = datetime.now().date()
+
     # 중복 체크: 같은 날짜에 같은 사용자가 이미 쓴 일기 있는지 확인
     statement = select(Diary).where(
         Diary.user_id == user_id,

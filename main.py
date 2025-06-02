@@ -40,7 +40,7 @@ app.add_middleware(
 )
 
 app.include_router(user_router, prefix="/users")
-app.include_router(diary_router, prefix="/diary")
+app.include_router(diary_router, prefix="/diarys")
 
 
 if __name__ == "__main__":
