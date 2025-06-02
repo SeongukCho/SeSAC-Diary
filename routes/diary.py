@@ -232,8 +232,7 @@ async def update_diary_entry( # 함수 이름 변경 (PEP8, CRUD 느낌 살려�
     session.refresh(diary)
     return diary
 
-@diary_router.
-("/{diary_id}", status_code=status.HTTP_204_NO_CONTENT) # 성공 시 204 No Content 반환
+@diary_router.delete("/{diary_id}", status_code=status.HTTP_204_NO_CONTENT) # 성공 시 204 No Content 반환
 async def delete_diary_entry( # 함수 이름 변경
     diary_id: int,
     user_id: int = Depends(authenticate),
